@@ -9,6 +9,7 @@ consistent and partition tolerant, peer-to-peer append-only log.
 
 It seems to work as intended to me but don't take it for granted!
 
+![](C:\Users\yinha\Documents\GitHub\py-swirld\animation.gif)
 
 ## Dependencies
 
