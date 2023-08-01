@@ -12,9 +12,10 @@ It seems to work as intended to me but don't take it for granted!
 
 ## Dependencies
 
-- python3 (obviously!)
-- [pysodium](https://pypi.python.org/pypi/pysodium) for the crypto
-- [bokeh](http://bokeh.pydata.org/en/latest/) for the analysis and interactive
+- python3==3.8.10
+- [pysodium==0.7.12](https://pypi.org/project/pysodium/0.7.12/) for the crypto tool
+- [Jinja2==3.0.0](https://pypi.org/project/Jinja2/3.0.0/) for the templating engine
+- [bokeh==2.4.3](https://docs.bokeh.org/en/2.4.3/) for the analysis and interactive
   visualization
 
 ## Usage / High-level explainations
