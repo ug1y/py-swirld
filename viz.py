@@ -7,7 +7,7 @@ from base64 import b64encode
 from time import localtime, strftime
 
 from bokeh.io import curdoc
-from bokeh.layouts import layout, widgetbox, row
+from bokeh.layouts import layout, column, row
 from bokeh.plotting import figure
 from bokeh.palettes import plasma, small_palettes
 from bokeh.models import (
@@ -19,12 +19,12 @@ from utils import bfs, randrange
 from swirld import Node
 
 
-R_COLORS = small_palettes['Greens'][9]
+R_COLORS = list(small_palettes['Greens'][9])
 shuffle(R_COLORS)
 def round_color(r):
     return R_COLORS[r % 9]
 
-I_COLORS = plasma(256)
+I_COLORS = list(plasma(256))
 def idx_color(r):
     return I_COLORS[r % 256]
 
@@ -48,10 +48,10 @@ class App:
         def toggle():
             if play.label == '► Play':
                 play.label = '❚❚ Pause'
-                curdoc().add_periodic_callback(self.animate, 50)
+                self.callfunc = curdoc().add_periodic_callback(self.animate, 50)
             else:
                 play.label = '► Play'
-                curdoc().remove_periodic_callback(self.animate)
+                curdoc().remove_periodic_callback(self.callfunc)
 
         play = Button(label='► Play', width=60)
         play.on_click(toggle)
@@ -79,7 +79,7 @@ class App:
 
         plot = figure(
                 plot_height=700, plot_width=900, y_range=(0, 30),
-                tools=[PanTool(dimensions=['height']),
+                tools=[PanTool(dimensions='height'),
                        HoverTool(tooltips=[
                            ('round', '@round'), ('hash', '@hash'),
                            ('timestamp', '@time'), ('payload', '@payload'),
@@ -107,7 +107,7 @@ class App:
                                    line_alpha='line_alpha', source=self.tr_src, line_width=5)
 
         sel_node(0)
-        curdoc().add_root(row([widgetbox(play, selector, width=300), plot], sizing_mode='fixed'))
+        curdoc().add_root(row([column(play, selector, width=300), plot]))
 
     def extract_data(self, node, trs, i):
         tr_data = {'x': [], 'y': [], 'round_color': [], 'idx': [],
