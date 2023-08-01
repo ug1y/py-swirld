@@ -11,6 +11,7 @@ from bokeh.layouts import layout, column, row
 from bokeh.plotting import figure
 from bokeh.palettes import plasma, small_palettes
 from bokeh.models import (
+        Slider,
         FixedTicker, Button, ColumnDataSource, PanTool, Scroll,
         RadioButtonGroup, RadioGroup, Arrow, NormalHead, HoverTool)
 from pysodium import crypto_sign_keypair
@@ -48,12 +49,15 @@ class App:
         def toggle():
             if play.label == '► Play':
                 play.label = '❚❚ Pause'
-                self.callfunc = curdoc().add_periodic_callback(self.animate, 50)
+                self.speed.disabled = True
+                self.callfunc = curdoc().add_periodic_callback(self.animate, self.speed.value*1000)
             else:
                 play.label = '► Play'
                 curdoc().remove_periodic_callback(self.callfunc)
+                self.speed.disabled = False
 
-        play = Button(label='► Play', width=60)
+        # wigetbox 1 - [button] for start and pause the animation.
+        play = Button(label='► Play', width=90, height=40)
         play.on_click(toggle)
 
         def sel_node(new):
@@ -72,10 +76,15 @@ class App:
                     print('updated')
             self.tr_src.trigger('data', None, self.tr_src.data)
 
+        # wigetbox 2 - [radio button group] for select node to switch views.
         selector = RadioButtonGroup(
                 labels=['Node %i' % i for i in range(n_nodes)], active=0,
-                name='Node to inspect')
+                name='Node to inspect', width=60*(n_nodes+1), align=['center','center'])
         selector.on_click(sel_node)
+
+        # wigetbox 3 - [slider] for adjust the speed of animation.
+        self.speed = Slider(start=0, end=3, value=0.1, step=0.1, title='speed(s)',
+                            width=210, height=40, format='0[.]0')
 
         plot = figure(
                 plot_height=700, plot_width=900, y_range=(0, 30),
@@ -107,7 +116,7 @@ class App:
                                    line_alpha='line_alpha', source=self.tr_src, line_width=5)
 
         sel_node(0)
-        curdoc().add_root(row([column(play, selector, width=300), plot]))
+        curdoc().add_root(column([row(play, selector, self.speed), plot]))
 
     def extract_data(self, node, trs, i):
         tr_data = {'x': [], 'y': [], 'round_color': [], 'idx': [],
