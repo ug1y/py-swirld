@@ -11,7 +11,7 @@ from bokeh.layouts import column, row
 from bokeh.plotting import figure
 from bokeh.palettes import plasma, small_palettes
 from bokeh.models import (
-    Slider, PreText, TextAreaInput,
+    Slider, PreText, TextAreaInput, DataTable, TableColumn,
     FixedTicker, Button, ColumnDataSource, PanTool, Scroll,
     RadioButtonGroup, RadioGroup, Arrow, NormalHead, HoverTool)
 from pysodium import crypto_sign_keypair
@@ -82,6 +82,8 @@ class App:
                     # print('updated')
             self.tr_src.trigger('data', None, self.tr_src.data)
             self.status.text = self.show_info()
+            self.data_src.data = self.show_data()
+            self.data_src.trigger('data', None, self.data_src.data)
 
         # widget 2 - [radio button group] for select node to switch views.
         selector = RadioButtonGroup(
@@ -131,11 +133,25 @@ class App:
             ('famous', '@line_alpha'), ('witness', '@witness'), ('number', '@idx')])
         plot.add_tools(hover)
 
+        # widget 7 - [data table] for print the consensus detail.
+        self.data_src = ColumnDataSource(
+            data={'round': [], 'event': [], 'witness': [], 'famous': [], 'decide': [], 'waiting': []})
+        cols = [
+            TableColumn(field="round", title="Round"),
+            TableColumn(field="event", title="Event"),
+            TableColumn(field="witness", title="Witness"),
+            TableColumn(field="famous", title="Famous"),
+            TableColumn(field="decide", title="Decide"),
+            TableColumn(field="waiting", title="waiting")]
+        table = DataTable(source=self.data_src, columns=cols, height=600, width=500,
+                          index_position=None, autosize_mode="fit_columns")
+
+        # organize the widgets.
         sel_node(0)
         curdoc().add_root(column([
             row(play, selector, self.speed),
             row(self.status, self.console),
-            plot]))
+            row(plot, table)]))
 
     def extract_data(self, node, trs, i):
         tr_data = {'x': [], 'y': [], 'round_color': [], 'idx': [],
@@ -189,6 +205,8 @@ class App:
                     # print('updated')
             self.tr_src.trigger('data', None, self.tr_src.data)
             self.status.text = self.show_info()
+            self.data_src.data = self.show_data()
+            self.data_src.trigger('data', None, self.data_src.data)
 
     def show_info(self):
         node = self.nodes[self.active]
@@ -200,6 +218,17 @@ class App:
         return s
 
     def show_data(self):
-        pass
+        node = self.nodes[self.active]
+        round = sorted(list(range(node.round[node.head] + 1)), reverse=True)
+        event = [sum([1 for k in node.round.keys() if node.round[k] == r]) for r in round]
+        witness = [len(node.witnesses[r]) for r in round]
+        famous = [sum([1 for w in node.witnesses[r].values() if w in node.famous]) for r in round]
+        decide = [[node.round[node.fameby[e[0]]] if len(e) != 0 and e[0] in node.fameby.keys() else -1 for e in v] for v in
+                  [[[w for w in node.witnesses[r].values() if self.ids[node.hg[w].c] == i] for i in range(node.n)] for r in round]]
+        waiting = [max(decide[i]) - r if max(decide[i]) != -1 else -1 for (i, r) in enumerate(round)]
+
+        data = dict(round=round, event=event, witness=witness, famous=famous, decide=decide, waiting=waiting)
+        return data
+
 
 App(int(sys.argv[1]))

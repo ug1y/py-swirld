@@ -62,6 +62,8 @@ class Node:
         # {round-num => {member-pk => event-hash}}: 
         self.witnesses = defaultdict(dict)
         self.famous = {}
+        # {x-hash => y-hash} i.e. event y decides event x to be famous
+        self.fameby = {}
 
         # {event-hash => int}: 0 or 1 + max(height of parents) (only useful for
         # drawing, it may move to viz.py)
@@ -262,6 +264,7 @@ class Node:
                         if t > self.min_s:
                             self.famous[x] = v
                             done.add(r)
+                            self.fameby[x] = y
                         else:
                             self.votes[y][x] = v
                     else:
@@ -307,8 +310,8 @@ class Node:
             for i, x in enumerate(final):
                 self.idx[x] = i + len(self.transactions)
             self.transactions += final
-        if self.consensus:
-            print(self.consensus)
+        # if self.consensus:
+        #     print(self.consensus)
 
 
 
