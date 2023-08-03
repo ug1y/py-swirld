@@ -50,6 +50,8 @@ class Node:
         self.head = None
         # {event-hash => round-num}: assigned round number of each event
         self.round = {}
+        # {event-hash}: events for waiting to decide rounds
+        self.newhs = set()
         # {event-hash}: events for which final order remains to be determined
         self.tbd = set()
         # [event-hash]: final order of the transactions
@@ -116,6 +118,7 @@ class Node:
     def add_event(self, h, ev):
         self.hg[h] = ev
         self.tbd.add(h)
+        self.newhs.add(h)
         if ev.p == ():
             self.height[h] = 0
         else:
@@ -185,27 +188,24 @@ class Node:
     def higher(self, a, b):
         return a is not None and (b is None or self.height[a] >= self.height[b])
 
-
-    def divide_rounds(self, events):
-        """Restore invariants for `can_see`, `witnesses` and `round`.
-
-        :param events: topologicaly sorted sequence of new event to process.
-        """
-
-        for h in events:
+    def divide_rounds(self):
+        """Restore invariants for `can_see`, `witnesses`, and `round` recursively."""
+        def divide_rounds_h(h):
             ev = self.hg[h]
             if ev.p == ():  # this is a root event
                 self.round[h] = 0
                 self.witnesses[0][ev.c] = h
                 self.can_see[h] = {ev.c: h}
             else:
-                r = max(self.round[p] for p in ev.p)
+                (sp, rp) = ev.p
+                if sp not in self.round.keys(): divide_rounds_h(sp)
+                if rp not in self.round.keys(): divide_rounds_h(rp)
+                r = max(self.round[sp], self.round[rp])
 
                 # recurrence relation to update can_see
                 p0, p1 = (self.can_see[p] for p in ev.p)
                 self.can_see[h] = {c: self.maxi(p0.get(c), p1.get(c))
                                    for c in p0.keys() | p1.keys()}
-
 
                 # count distinct paths to distinct nodes
                 hits = defaultdict(int)
@@ -214,14 +214,25 @@ class Node:
                         for c_, k_ in self.can_see[k].items():
                             if self.round[k_] == r:
                                 hits[c_] += self.stake[c]
-                # check if i can strongly see enough events
+
+                # check if h can strongly see enough events
                 if sum(1 for x in hits.values() if x > self.min_s) > self.min_s:
                     self.round[h] = r + 1
                 else:
                     self.round[h] = r
+
+                # update can_see
                 self.can_see[h][ev.c] = h
+
+                # update witnesses
                 if self.round[h] > self.round[ev.p[0]]:
                     self.witnesses[self.round[h]][ev.c] = h
+
+        while len(self.newhs) > 0:
+            h = self.newhs.pop()
+            if h not in self.round.keys():
+                divide_rounds_h(h)
+
 
     def decide_fame(self):
         max_r = max(self.witnesses)
@@ -324,10 +335,15 @@ class Node:
 
             # pick a random node to sync with but not me
             c = tuple(self.network.keys() - {self.pk})[randrange(self.n - 1)]
+            # 1. receive a sync
             new = self.sync(c, payload)
-            self.divide_rounds(new)
+            # 2. create a new event
 
+            # 3. divide rounds for hashgraph
+            self.divide_rounds()
+            # 4. decide event famous or not
             new_c = self.decide_fame()
+            # 5. order events who are famous
             self.find_order(new_c)
 
 
