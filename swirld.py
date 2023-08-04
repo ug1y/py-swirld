@@ -11,7 +11,7 @@ from pysodium import (crypto_sign_keypair, crypto_sign, crypto_sign_open,
                       crypto_sign_detached, crypto_sign_verify_detached,
                       crypto_generichash)
 
-from utils import bfs, toposort, randrange
+from utils import bfs, toposort, randrange, highest
 
 
 C = 6
@@ -48,6 +48,8 @@ class Node:
         self.hg = {}
         # event-hash: latest event from me
         self.head = None
+        # {member-pk => event-hash}: latest event of each node from me
+        self.hds = {}
         # {event-hash => round-num}: assigned round number of each event
         self.round = {}
         # {event-hash}: events for waiting to decide rounds
@@ -82,6 +84,7 @@ class Node:
         self.witnesses[0][ev.c] = h
         self.can_see[h] = {ev.c: h}
         self.head = h
+        self.hds[self.pk] = h
 
     def new_event(self, d, p):
         """Create a new event (and also return it's hash)."""
@@ -124,7 +127,7 @@ class Node:
         else:
             self.height[h] = max(self.height[p] for p in ev.p) + 1
 
-    def sync(self, pk, payload):
+    def sync(self, pk):
         """Update hg and return new event ids in topological order."""
 
         info = crypto_sign(dumps({c: self.height[h]
@@ -140,15 +143,9 @@ class Node:
             if self.is_valid_event(h, ev):
                 self.add_event(h, ev)
 
+        self.hds[pk] = remote_head
 
-        if self.is_valid_event(remote_head, remote_hg[remote_head]):
-            h, ev = self.new_event(payload, (self.head, remote_head))
-            # this really shouldn't fail, let's check it to be sure
-            assert self.is_valid_event(h, ev)
-            self.add_event(h, ev)
-            self.head = h
-
-        return new + (h,)
+        return new
 
     def ask_sync(self, pk, info):
         """Respond to someone wanting to sync (only public method)."""
@@ -164,6 +161,23 @@ class Node:
                        if self.hg[p].c not in cs or self.height[p] > cs[self.hg[p].c]))}
         msg = dumps((self.head, subset))
         return crypto_sign(msg, self.sk)
+
+    def create_event(self, payload):
+
+        # idea 1: select the highest event from others.
+        highest_remote_heads = highest(set(self.hds.values()) - {self.head}, lambda u: self.height[u])
+        i = randrange(len(highest_remote_heads))
+
+        remote_head = highest_remote_heads[i]
+        if self.is_valid_event(remote_head, self.hg[remote_head]):
+            h, ev = self.new_event(payload, (self.head, remote_head))
+            # this really shouldn't fail, let's check it to be sure
+            assert self.is_valid_event(h, ev)
+            self.add_event(h, ev)
+            self.head = h
+            self.hds[self.pk] = h
+            return True
+        return False
 
     def ancestors(self, c):
         while True:
@@ -336,9 +350,9 @@ class Node:
             # pick a random node to sync with but not me
             c = tuple(self.network.keys() - {self.pk})[randrange(self.n - 1)]
             # 1. receive a sync
-            new = self.sync(c, payload)
-            # 2. create a new event
-
+            new = self.sync(c)
+            # 2. create a new event (adaptively select ref !!!)
+            self.create_event(payload)
             # 3. divide rounds for hashgraph
             self.divide_rounds()
             # 4. decide event famous or not
@@ -362,3 +376,5 @@ def test(n_nodes, n_turns):
         print('working node: %i, event number: %i' % (r, i))
         next(mains[r])
     return nodes
+
+# test(6,100)

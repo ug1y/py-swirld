@@ -53,3 +53,15 @@ def randrange(n):
     while r >= n:
         r = int.from_bytes(randombytes(a), byteorder='big') >> b
     return r
+
+
+def highest(h, height):
+    s = sorted(h, key=lambda u: height(u), reverse=True)
+    m = height(s[0])
+    g = []
+    for i in range(len(s)):
+        if height(s[i]) == m:
+            g.append(s[i])
+        else:
+            break
+    return g
