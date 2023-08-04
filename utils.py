@@ -7,6 +7,7 @@ from pysodium import randombytes
 
 def toposort(nodes, parents):
     seen = {}
+
     def visit(u):
         if u in seen:
             if seen[u] == 0:
@@ -17,6 +18,7 @@ def toposort(nodes, parents):
                 yield from visit(v)
             seen[u] = 1
             yield u
+
     for u in nodes:
         yield from visit(u)
 
@@ -48,7 +50,7 @@ def dfs(s, succ):
 
 def randrange(n):
     a = (n.bit_length() + 7) // 8  # number of bytes to store n
-    b = 8 * a - n.bit_length()     # number of shifts to have good bit number
+    b = 8 * a - n.bit_length()  # number of shifts to have good bit number
     r = int.from_bytes(randombytes(a), byteorder='big') >> b
     while r >= n:
         r = int.from_bytes(randombytes(a), byteorder='big') >> b
@@ -65,3 +67,14 @@ def highest(h, height):
         else:
             break
     return g
+
+
+def mostdiff(c, h, height, cansee):
+    g = {}
+    e = cansee(c)
+    for (k, v) in h.items():
+        if v == c: continue
+        a = height(v)
+        b = height(e[k]) if k in e else 0
+        g[v] = a - b
+    return highest(g.keys(), lambda u: g[u])

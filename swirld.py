@@ -11,7 +11,7 @@ from pysodium import (crypto_sign_keypair, crypto_sign, crypto_sign_open,
                       crypto_sign_detached, crypto_sign_verify_detached,
                       crypto_generichash)
 
-from utils import bfs, toposort, randrange, highest
+from utils import bfs, toposort, randrange, highest, mostdiff
 
 
 C = 6
@@ -167,8 +167,13 @@ class Node:
         # idea 1: select the highest event from others.
         highest_remote_heads = highest(set(self.hds.values()) - {self.head}, lambda u: self.height[u])
         i = randrange(len(highest_remote_heads))
+        # remote_head = highest_remote_heads[i]
 
-        remote_head = highest_remote_heads[i]
+        # idea 2: select the node who has most differ events.
+        mostdiff_remote_heads = mostdiff(self.head, self.hds, lambda u: self.height[u], lambda u: self.can_see[u])
+        j = randrange(len(mostdiff_remote_heads))
+        remote_head = mostdiff_remote_heads[j]
+
         if self.is_valid_event(remote_head, self.hg[remote_head]):
             h, ev = self.new_event(payload, (self.head, remote_head))
             # this really shouldn't fail, let's check it to be sure
@@ -376,5 +381,3 @@ def test(n_nodes, n_turns):
         print('working node: %i, event number: %i' % (r, i))
         next(mains[r])
     return nodes
-
-# test(6,100)
