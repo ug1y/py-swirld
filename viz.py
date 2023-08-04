@@ -125,7 +125,7 @@ class App:
                   'line_alpha': [], 'round': [], 'hash': [], 'payload': [],
                   'time': []})
 
-        self.tr_rend = plot.circle(x='x', y='y', size=20, color='round_color',
+        self.tr_rend = plot.circle(x='x', y='y', size=20, color='round_color', line_color='#000000',
                                    line_alpha='line_alpha', source=self.tr_src, line_width=5)
 
         hover = HoverTool(renderers=[self.tr_rend], tooltips=[
