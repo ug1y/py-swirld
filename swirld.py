@@ -77,6 +77,8 @@ class Node:
         # and for each member m the latest event from m having same round
         # number as ev that ev can see
         self.can_see = {}
+        # {event-hash => int}: the amount of referring to the event
+        self.in_degree = {}
 
         # init first local event
         h, ev = self.new_event(None, ())
@@ -125,8 +127,12 @@ class Node:
         self.newhs.add(h)
         if ev.p == ():
             self.height[h] = 0
+            self.in_degree[h] = 0
         else:
             self.height[h] = max(self.height[p] for p in ev.p) + 1
+            self.in_degree[h] = 0
+            for p in ev.p:
+                self.in_degree[p] += 1
 
     def sync(self, pk):
         """Update hg and return new event ids in topological order."""

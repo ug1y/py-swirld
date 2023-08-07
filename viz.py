@@ -123,14 +123,14 @@ class App:
         self.tr_src = ColumnDataSource(
             data={'x': [], 'y': [], 'round_color': [], 'idx': [],
                   'line_alpha': [], 'round': [], 'hash': [], 'payload': [],
-                  'time': []})
+                  'time': [], 'witness': [], 'in_degree': []})
 
         self.tr_rend = plot.circle(x='x', y='y', size=20, color='round_color', line_color='#000000',
                                    line_alpha='line_alpha', source=self.tr_src, line_width=5)
 
         hover = HoverTool(renderers=[self.tr_rend], tooltips=[
             ('round', '@round'), ('hash', '@hash'), ('timestamp', '@time'), ('payload', '@payload'),
-            ('famous', '@line_alpha'), ('witness', '@witness'), ('number', '@idx')])
+            ('famous', '@line_alpha'), ('witness', '@witness'), ('number', '@idx'), ('in_degree', '@in_degree')])
         plot.add_tools(hover)
 
         # widget 7 - [data table] for print the consensus detail.
@@ -156,7 +156,7 @@ class App:
     def extract_data(self, node, trs, i):
         tr_data = {'x': [], 'y': [], 'round_color': [], 'idx': [],
                    'line_alpha': [], 'round': [], 'hash': [], 'payload': [],
-                   'time': []}
+                   'time': [], 'witness': [], 'in_degree': []}
         links_data = {'x0': [], 'y0': [], 'x1': [], 'y1': [], 'width': []}
         for j, u in enumerate(trs):
             self.tbd[u] = i + j
@@ -170,6 +170,8 @@ class App:
             tr_data['hash'].append(b64encode(u).decode('utf8'))
             tr_data['payload'].append(ev.d)
             tr_data['time'].append(strftime("%Y-%m-%d %H:%M:%S", localtime(ev.t)))
+            tr_data['witness'].append(u in node.witnesses[node.round[u]].values())
+            tr_data['in_degree'].append(node.in_degree[u])
 
             tr_data['idx'].append(None)
             tr_data['line_alpha'].append(None)
