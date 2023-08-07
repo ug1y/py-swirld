@@ -57,8 +57,8 @@ def randrange(n):
     return r
 
 
-def highest(h, height):
-    s = sorted(h, key=lambda u: height(u), reverse=True)
+def _sortest_(h, height, reverse):
+    s = sorted(h, key=lambda u: height(u), reverse=reverse)
     m = height(s[0])
     g = []
     for i in range(len(s)):
@@ -69,12 +69,29 @@ def highest(h, height):
     return g
 
 
-def mostdiff(c, h, height, cansee):
+def highest(h, height):
+    return _sortest_(h, height, reverse=True)
+
+
+def lowest(h, height):
+    return _sortest_(h, height, reverse=False)
+
+
+def _diffsort_(c, h, height, can_see, reverse):
     g = {}
-    e = cansee(c)
+    e = can_see(c)
     for (k, v) in h.items():
-        if v == c: continue
+        if v == c:
+            continue
         a = height(v)
         b = height(e[k]) if k in e else 0
         g[v] = a - b
-    return highest(g.keys(), lambda u: g[u])
+    return _sortest_(g.keys(), lambda u: g[u], reverse)
+
+
+def more_diff(c, h, height, can_see):
+    return _diffsort_(c, h, height, can_see, reverse=True)
+
+
+def less_diff(c, h, height, can_see):
+    return _diffsort_(c, h, height, can_see, reverse=False)

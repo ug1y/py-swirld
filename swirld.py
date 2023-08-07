@@ -11,10 +11,10 @@ from pysodium import (crypto_sign_keypair, crypto_sign, crypto_sign_open,
                       crypto_sign_detached, crypto_sign_verify_detached,
                       crypto_generichash)
 
-from utils import bfs, toposort, randrange, highest, mostdiff
-
+from utils import bfs, toposort, randrange, highest, lowest, more_diff, less_diff
 
 C = 6
+REF_MODE = 0
 
 
 def majority(it):
@@ -28,6 +28,8 @@ def majority(it):
 
 
 Event = namedtuple('Event', 'd p t c s')
+
+
 class Trilean:
     false = 0
     true = 1
@@ -42,7 +44,6 @@ class Node:
         self.stake = stake
         self.tot_stake = sum(stake.values())
         self.min_s = 2 * self.tot_stake / 3  # min stake amount
-
 
         # {event-hash => event}: this is the hash graph
         self.hg = {}
@@ -89,7 +90,7 @@ class Node:
     def new_event(self, d, p):
         """Create a new event (and also return it's hash)."""
 
-        assert p == () or len(p) == 2                   # 2 parents
+        assert p == () or len(p) == 2  # 2 parents
         assert p == () or self.hg[p[0]].c == self.pk  # first exists and is self-parent
         assert p == () or self.hg[p[1]].c != self.pk  # second exists and not self-parent
         # TODO: fail if an ancestor of p[1] from creator self.pk is not an
@@ -114,9 +115,9 @@ class Node:
                          and self.hg[ev.p[0]].c == ev.c
                          and self.hg[ev.p[1]].c != ev.c)))
 
-                         # TODO: check if there is a fork (rly need reverse edges?)
-                         #and all(self.hg[x].c != ev.c
-                         #        for x in self.preds[ev.p[0]]))))
+        # TODO: check if there is a fork (rly need reverse edges?)
+        # and all(self.hg[x].c != ev.c
+        #        for x in self.preds[ev.p[0]]))))
 
     def add_event(self, h, ev):
         self.hg[h] = ev
@@ -131,12 +132,12 @@ class Node:
         """Update hg and return new event ids in topological order."""
 
         info = crypto_sign(dumps({c: self.height[h]
-                for c, h in self.can_see[self.head].items()}), self.sk)
+                                  for c, h in self.can_see[self.head].items()}), self.sk)
         msg = crypto_sign_open(self.network[pk](self.pk, info), pk)
 
         remote_head, remote_hg = loads(msg)
         new = tuple(toposort(remote_hg.keys() - self.hg.keys(),
-                       lambda u: remote_hg[u].p))
+                             lambda u: remote_hg[u].p))
 
         for h in new:
             ev = remote_hg[h]
@@ -162,17 +163,22 @@ class Node:
         msg = dumps((self.head, subset))
         return crypto_sign(msg, self.sk)
 
-    def create_event(self, payload):
+    def create_event(self, pk, payload):
 
-        # idea 1: select the highest event from others.
-        highest_remote_heads = highest(set(self.hds.values()) - {self.head}, lambda u: self.height[u])
-        i = randrange(len(highest_remote_heads))
-        # remote_head = highest_remote_heads[i]
+        if REF_MODE == 1:  # select the highest event as ref from others.
+            remote_heads = highest(set(self.hds.values()) - {self.head}, lambda u: self.height[u])
+        elif REF_MODE == 2:  # select the lowest event as ref from others.
+            remote_heads = lowest(set(self.hds.values()) - {self.head}, lambda u: self.height[u])
+        elif REF_MODE == 3:  # select the node to ref which has more differ events.
+            remote_heads = more_diff(self.head, self.hds, lambda u: self.height[u], lambda u: self.can_see[u])
+        elif REF_MODE == 4:  # select the node to ref which has less differ events.
+            remote_heads = less_diff(self.head, self.hds, lambda u: self.height[u], lambda u: self.can_see[u])
+        elif REF_MODE == 5:  # randomly select an event as ref.
+            remote_heads = list(set(self.hds.values()) - {self.head})
+        else:  # default select the sync node to refer.
+            remote_heads = [self.hds[pk]]
 
-        # idea 2: select the node who has most differ events.
-        mostdiff_remote_heads = mostdiff(self.head, self.hds, lambda u: self.height[u], lambda u: self.can_see[u])
-        j = randrange(len(mostdiff_remote_heads))
-        remote_head = mostdiff_remote_heads[j]
+        remote_head = remote_heads[randrange(len(remote_heads))]
 
         if self.is_valid_event(remote_head, self.hg[remote_head]):
             h, ev = self.new_event(payload, (self.head, remote_head))
@@ -209,6 +215,7 @@ class Node:
 
     def divide_rounds(self):
         """Restore invariants for `can_see`, `witnesses`, and `round` recursively."""
+
         def divide_rounds_h(h):
             ev = self.hg[h]
             if ev.p == ():  # this is a root event
@@ -251,7 +258,6 @@ class Node:
             h = self.newhs.pop()
             if h not in self.round.keys():
                 divide_rounds_h(h)
-
 
     def decide_fame(self):
         max_r = max(self.witnesses)
@@ -309,7 +315,6 @@ class Node:
         self.consensus |= new_c
         return new_c
 
-
     def find_order(self, new_c):
         to_int = lambda x: int.from_bytes(self.hg[x].s, byteorder='big')
 
@@ -322,7 +327,7 @@ class Node:
                          lambda u: (p for p in self.hg[u].p if p in self.tbd)):
                 c = self.hg[x].c
                 s = {w for w in f_w if c in self.can_see[w]
-                                    and self.higher(self.can_see[w][c], x)}
+                     and self.higher(self.can_see[w][c], x)}
                 if sum(self.stake[self.hg[w].c] for w in s) > self.tot_stake / 2:
                     self.tbd.remove(x)
                     seen.add(x)
@@ -335,15 +340,13 @@ class Node:
                             a = self.hg[a].p[0]
                         times.append(self.hg[a].t)
                     times.sort()
-                    ts[x] = .5*(times[len(times)//2]+times[(len(times)+1)//2])
+                    ts[x] = .5 * (times[len(times) // 2] + times[(len(times) + 1) // 2])
             final = sorted(seen, key=lambda x: (ts[x], white ^ to_int(x)))
             for i, x in enumerate(final):
                 self.idx[x] = i + len(self.transactions)
             self.transactions += final
         # if self.consensus:
         #     print(self.consensus)
-
-
 
     def main(self):
         """Main working loop."""
@@ -357,7 +360,7 @@ class Node:
             # 1. receive a sync
             new = self.sync(c)
             # 2. create a new event (adaptively select ref !!!)
-            self.create_event(payload)
+            self.create_event(c, payload)
             # 3. divide rounds for hashgraph
             self.divide_rounds()
             # 4. decide event famous or not
@@ -378,6 +381,17 @@ def test(n_nodes, n_turns):
         next(m)
     for i in range(n_turns):
         r = randrange(n_nodes)
-        print('working node: %i, event number: %i' % (r, i))
+        # print('working node: %i, event number: %i' % (r, i))
         next(mains[r])
     return nodes
+
+
+# test some index for different ref mode.
+if __name__ == '__main__':
+    for i in [0, 1, 3, 5]:
+        REF_MODE = i
+        nodes = test(6, 1000)
+        node0 = nodes[0]
+        print('mode', i, ': { rounds:', node0.round[node0.head],
+              ', consensus:', len(node0.consensus),
+              ', height:', node0.height[node0.head], '}')
