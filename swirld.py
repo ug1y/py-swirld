@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-
+import math
 from collections import namedtuple, defaultdict
 from pickle import dumps, loads
 from random import choice
@@ -394,6 +394,7 @@ def test(n_nodes, n_turns):
 
 # test some index for different ref mode.
 if __name__ == '__main__':
+    import numpy as np
     for i in [0, 1, 3, 5]:
         REF_MODE = i
         nodes = test(6, 1000)
@@ -401,3 +402,12 @@ if __name__ == '__main__':
         print('mode', i, ': { rounds:', node0.round[node0.head],
               ', consensus:', len(node0.consensus),
               ', height:', node0.height[node0.head], '}')
+        idd = {}
+        for (h, d) in node0.in_degree.items():
+            idd[d] = idd[d] + 1 if d in idd else 1
+        print(sorted(idd.items()))
+        vals = np.array(list(idd.keys()))
+        weis = np.array(list(idd.values()))
+        ave = np.average(vals, weights=weis)
+        var = np.average((vals-ave)**2, weights=weis)
+        print(ave, math.sqrt(var))
