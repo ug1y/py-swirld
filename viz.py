@@ -99,7 +99,7 @@ class App:
         self.status = PreText(text='show alg info', width=880)
 
         # widget 5 - [text area input] for print the working log.
-        self.console = TextAreaInput(value=">>> start animation <<<\n", width=520, rows=4, title="Runtime Output:")
+        self.console = TextAreaInput(value=">>> start animation <<<\n", width=520, rows=5, title="Runtime Output:")
 
         # widget 6 - [figure] for present the animation.
         plot = figure(
@@ -216,7 +216,11 @@ class App:
         s += "[head event hash]  : " + b64encode(node.head).decode('utf8') + "\n"
         s += "[number of events] : " + str(len(node.hg)) + "\n"
         s += "[max round number] : " + str(node.round[node.head]) + "\n"
-        s += "[max consensus id] : " + ('-1' if len(node.consensus) == 0 else str(max(node.consensus))) + "\n"
+        ws = sorted(node.local_round.keys(), key=lambda x: node.round[x], reverse=True)
+        w = ws[0] if len(ws) > 0 else None
+        s += "[local cons stage] : " + ('-1 (local round: -1)' if w is None else
+                                        str(node.round[w]) + '(local round: ' + str(node.local_round[w]) + ')') + "\n"
+        s += "[global cons line] : " + ('-1' if len(node.consensus) == 0 else str(max(node.consensus))) + "\n"
         return s
 
     def show_data(self):
@@ -225,8 +229,9 @@ class App:
         event = [sum([1 for k in node.round.keys() if node.round[k] == r]) for r in round]
         witness = [len(node.witnesses[r]) for r in round]
         famous = [sum([1 for w in node.witnesses[r].values() if w in node.famous]) for r in round]
-        decide = [[node.round[node.fameby[e[0]]] if len(e) != 0 and e[0] in node.fameby.keys() else -1 for e in v] for v in
-                  [[[w for w in node.witnesses[r].values() if self.ids[node.hg[w].c] == i] for i in range(node.n)] for r in round]]
+        decide = [[node.round[node.fameby[e[0]]] if len(e) != 0 and e[0] in node.fameby.keys() else -1 for e in v]
+                  for v in [[[w for w in node.witnesses[r].values() if self.ids[node.hg[w].c] == i]
+                             for i in range(node.n)] for r in round]]
         waiting = [max(decide[i]) - r if max(decide[i]) != -1 else -1 for (i, r) in enumerate(round)]
 
         data = dict(round=round, event=event, witness=witness, famous=famous, decide=decide, waiting=waiting)

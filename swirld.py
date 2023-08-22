@@ -69,6 +69,12 @@ class Node:
         self.famous = {}
         # {x-hash => y-hash} i.e. event y decides event x to be famous
         self.fameby = {}
+        # {witness-hash => local-round-num}: local round
+        self.local_round = {}
+        # {witness-x-hash => witness-y-hash}: witness y decides witness x
+        self.decide_from = {}
+        # int:
+        self.global_line = -1
 
         # {event-hash => int}: 0 or 1 + max(height of parents) (only useful for
         # drawing, it may move to viz.py)
@@ -265,6 +271,58 @@ class Node:
             if h not in self.round.keys():
                 divide_rounds_h(h)
 
+    def decide_famous(self):
+        # separate consensus in each blockchain.
+        for pk in self.network.keys():
+            max_r = self.round[self.hds[pk]] if pk in self.hds else -1
+            lws = [w for w in self.local_round.keys() if w in self.hg and self.hg[w].c == pk]
+            max_d = max([self.round[w] for w in lws]) if len(lws) > 0 else -1
+
+            # print("\n>>>", b64encode(pk).decode('utf8'), max_r, max_d, "<<<")
+
+            def last_witness(w):
+                for r in range(self.round[w] - 1, -1, -1):
+                    if self.hg[w].c in self.witnesses[r].keys():
+                        return self.witnesses[r][self.hg[w].c]
+                return None
+
+            def iter_witness(r_start, r_end):
+                for r in range(r_start, r_end):
+                    if pk in self.witnesses[r].keys():
+                        yield self.witnesses[r][pk]
+
+            for wx in iter_witness(max_d + 1, max_r - 1):
+                for wy in iter_witness(self.round[wx] + 2, max_r + 1):
+                    hit = 0
+                    for c, k in self.can_see[wy].items():
+                        if self.round[k] == self.round[wy] - 1:
+                            ws = self.witnesses[self.round[k]][c]
+                            if pk in self.can_see[ws] and self.round[self.can_see[ws][pk]] >= self.round[wx]:
+                                hit += self.stake[c]
+                    if hit > self.min_s:
+                        self.famous[wx] = True
+                        self.decide_from[wx] = wy
+                        self.fameby[wx] = wy
+                        if self.round[wx] == 0:
+                            self.local_round[wx] = 1
+                        else:
+                            last_wx = last_witness(wx)  # not supposed to be None
+                            if self.round[self.decide_from[last_wx]] == self.round[wy]:
+                                self.local_round[wx] = self.local_round[last_wx]
+                            elif self.round[self.decide_from[last_wx]] < self.round[wy]:
+                                self.local_round[wx] = self.local_round[last_wx] + 1
+                        break
+
+        new_c = set()
+        for r in range(self.global_line + 1, max(self.witnesses)):
+            if all(w in self.famous for w in self.witnesses[r].values()):
+                new_c.add(r)
+            else:
+                self.global_line = r - 1
+                break
+        self.consensus |= new_c
+        return new_c
+
     def decide_fame(self):
         max_r = max(self.witnesses)
         max_c = 0
@@ -370,7 +428,7 @@ class Node:
             # 3. divide rounds for hashgraph
             self.divide_rounds()
             # 4. decide event famous or not
-            new_c = self.decide_fame()
+            new_c = self.decide_famous()
             # 5. order events who are famous
             self.find_order(new_c)
 
