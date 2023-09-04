@@ -14,7 +14,6 @@ from pysodium import (crypto_sign_keypair, crypto_sign, crypto_sign_open,
 from utils import bfs, toposort, randrange, highest, lowest, more_diff, less_diff
 
 C = 6
-REF_MODE = 0
 
 
 def majority(it):
@@ -37,13 +36,14 @@ class Trilean:
 
 
 class Node:
-    def __init__(self, kp, network, n_nodes, stake):
+    def __init__(self, kp, network, n_nodes, stake, ref_mode=0):
         self.pk, self.sk = kp
         self.network = network  # {pk -> Node.ask_sync} dict
         self.n = n_nodes
         self.stake = stake
         self.tot_stake = sum(stake.values())
         self.min_s = 2 * self.tot_stake / 3  # min stake amount
+        self.ref_mode = ref_mode  # ref strategies (0,1,2,3,4,5)
 
         # {event-hash => event}: this is the hash graph
         self.hg = {}
@@ -177,15 +177,15 @@ class Node:
 
     def create_event(self, pk, payload):
 
-        if REF_MODE == 1:  # select the highest event as ref from others.
+        if self.ref_mode == 1:  # select the highest event as ref from others.
             remote_heads = highest(set(self.hds.values()) - {self.head}, lambda u: self.height[u])
-        elif REF_MODE == 2:  # select the lowest event as ref from others.
+        elif self.ref_mode == 2:  # select the lowest event as ref from others.
             remote_heads = lowest(set(self.hds.values()) - {self.head}, lambda u: self.height[u])
-        elif REF_MODE == 3:  # select the node to ref which has more differ events.
+        elif self.ref_mode == 3:  # select the node to ref which has more differ events.
             remote_heads = more_diff(self.head, self.hds, lambda u: self.height[u], lambda u: self.can_see[u])
-        elif REF_MODE == 4:  # select the node to ref which has less differ events.
+        elif self.ref_mode == 4:  # select the node to ref which has less differ events.
             remote_heads = less_diff(self.head, self.hds, lambda u: self.height[u], lambda u: self.can_see[u])
-        elif REF_MODE == 5:  # randomly select an event as ref.
+        elif self.ref_mode == 5:  # randomly select an event as ref.
             remote_heads = list(set(self.hds.values()) - {self.head})
         else:  # default select the sync node to refer.
             remote_heads = [self.hds[pk]]
@@ -433,11 +433,11 @@ class Node:
             self.find_order(new_c)
 
 
-def test(n_nodes, n_turns):
+def test(n_nodes, n_turns, ref_mode=0):
     kps = [crypto_sign_keypair() for _ in range(n_nodes)]
     network = {}
     stake = {kp[0]: 1 for kp in kps}
-    nodes = [Node(kp, network, n_nodes, stake) for kp in kps]
+    nodes = [Node(kp, network, n_nodes, stake, ref_mode) for kp in kps]
     for n in nodes:
         network[n.pk] = n.ask_sync
     mains = [n.main() for n in nodes]
@@ -449,23 +449,3 @@ def test(n_nodes, n_turns):
         next(mains[r])
     return nodes
 
-
-# test some index for different ref mode.
-if __name__ == '__main__':
-    import numpy as np
-    for i in [0, 1, 3, 5]:
-        REF_MODE = i
-        nodes = test(6, 1000)
-        node0 = nodes[0]
-        print('mode', i, ': { rounds:', node0.round[node0.head],
-              ', consensus:', len(node0.consensus),
-              ', height:', node0.height[node0.head], '}')
-        idd = {}
-        for (h, d) in node0.in_degree.items():
-            idd[d] = idd[d] + 1 if d in idd else 1
-        print(sorted(idd.items()))
-        vals = np.array(list(idd.keys()))
-        weis = np.array(list(idd.values()))
-        ave = np.average(vals, weights=weis)
-        var = np.average((vals-ave)**2, weights=weis)
-        print(ave, math.sqrt(var))
