@@ -29,23 +29,26 @@ def exec_exp(n, s, m, c=100):
     if not os.path.exists(work):
         os.mkdir(work)
     for i in range(c):
-        print('executing progress =====> ' + str(i+1) + '/' + str(c))
+        print('executing progress =====> ' + str(i+1) + '/' + str(c), end='')
+        start = time.perf_counter()
         res = run_once(n, s, m)
+        end = time.perf_counter()
+        print(', time used ' + str(end-start) + 's')
         ct = time.strftime('%Y%m%d_%H%M%S')
         with open(os.path.join(work, ct), 'w', encoding='utf-8') as f:
             f.write(json.dumps(res))
+    return work
 
 
-def comp_avg(n, s, m):
-    work = os.path.join(EXPS_DATA_PATH, 'n' + str(n) + '_s' + str(s) + '_m' + str(m))
+def comp_avg(work, name):
     if not os.path.exists(work):
         return
     files = os.listdir(work)
-    if 'avg_data' in files:
-        files.remove('avg_data')
+    if name in files:
+        files.remove(name)
     data = []
-    for name in files:
-        with open(os.path.join(work, name), 'r', encoding='utf-8') as f:
+    for file in files:
+        with open(os.path.join(work, file), 'r', encoding='utf-8') as f:
             data.append(json.loads(f.read()))
 
     avg_data = {}
@@ -69,18 +72,40 @@ def comp_avg(n, s, m):
     avg_data['degree'] = avg_d
     avg_data['stderr'] = sum_s / count
 
-    print(avg_data)
-    with open(os.path.join(work, 'avg_data'), 'w', encoding='utf-8') as f:
+    print(str(work))
+    print(str(avg_data)+'\n')
+    with open(os.path.join(work, name), 'w', encoding='utf-8') as f:
+        f.write(str(work)+'\n')
         f.write(json.dumps(avg_data))
 
 
-if __name__ == '__main__':
-    nodes = 6  # n=3f+1, 4, 7, 10, 13
-    steps = 10000  # total events or blocks
-    ref_mode = 0  # 0: gossip, 1: height, 3: differ, 5: random
-    count = 100  # running multiple times to get average
-    # executing the experiments
-    exec_exp(nodes, steps, ref_mode, count)
-    # computing the average result
-    comp_avg(nodes, steps, ref_mode)
+def clear_avg_data(name):
+    dirs = os.listdir(EXPS_DATA_PATH)
+    for d in dirs:
+        os.remove(os.path.join(EXPS_DATA_PATH, d, name))
+    print('clear all average data done !')
 
+
+def dump_avg_data(name):
+    dirs = os.listdir(EXPS_DATA_PATH)
+    for d in dirs:
+        comp_avg(os.path.join(EXPS_DATA_PATH, d), name)
+    print('dump all average data done !')
+
+
+def test_res_data():
+    nodes = 16  # n=3f+1, 4, 7, 10, 13, 16, 19, 22, 25, 28
+    steps = 10000  # total events or blocks
+    ref_mode = 5  # 0: gossip, 1: height, 3: differ, 5: random
+    count = 100  # running multiple times to get average
+    print('[running experiments with nodes='+str(nodes)+', steps='+str(steps)+' and ref_mode='+str(ref_mode)+']')
+    # executing the experiments
+    work = exec_exp(nodes, steps, ref_mode, count)
+    # computing the average result
+    comp_avg(work, '00_avg_data')
+
+
+if __name__ == '__main__':
+    test_res_data()
+    # dump_avg_data('00_avg_data')
+    # clear_avg_data('00_avg_data')
