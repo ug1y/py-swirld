@@ -2,9 +2,9 @@ import numpy as np
 from swirld import test
 import math, os, time, json
 
-EXPS_DATA_PATH = 'GenGraph'
-if not os.path.exists(EXPS_DATA_PATH):
-    os.mkdir(EXPS_DATA_PATH)
+EXP_DATA_PATH = 'GenGraph'
+if not os.path.exists(EXP_DATA_PATH):
+    os.mkdir(EXP_DATA_PATH)
 
 
 def run_once(n, steps, ref_mode=0):
@@ -25,15 +25,15 @@ def run_once(n, steps, ref_mode=0):
 
 
 def exec_exp(n, s, m, c=100):
-    work = os.path.join(EXPS_DATA_PATH, 'n' + str(n) + '_s' + str(s) + '_m' + str(m))
+    work = os.path.join(EXP_DATA_PATH, 'n' + str(n) + '_s' + str(s) + '_m' + str(m))
     if not os.path.exists(work):
         os.mkdir(work)
     for i in range(c):
-        print('executing progress =====> ' + str(i+1) + '/' + str(c), end='')
+        print('executing progress =====> ' + str(i + 1) + '/' + str(c), end='')
         start = time.perf_counter()
         res = run_once(n, s, m)
         end = time.perf_counter()
-        print(', time used ' + str(end-start) + 's')
+        print(', time used ' + str(end - start) + 's')
         ct = time.strftime('%Y%m%d_%H%M%S')
         with open(os.path.join(work, ct), 'w', encoding='utf-8') as f:
             f.write(json.dumps(res))
@@ -73,32 +73,33 @@ def comp_avg(work, name):
     avg_data['stderr'] = sum_s / count
 
     print(str(work))
-    print(str(avg_data)+'\n')
+    print(str(avg_data) + '\n')
     with open(os.path.join(work, name), 'w', encoding='utf-8') as f:
-        f.write(str(work)+'\n')
+        f.write(str(work) + '\n')
         f.write(json.dumps(avg_data))
 
 
 def clear_avg_data(name):
-    dirs = os.listdir(EXPS_DATA_PATH)
+    dirs = os.listdir(EXP_DATA_PATH)
     for d in dirs:
-        os.remove(os.path.join(EXPS_DATA_PATH, d, name))
+        os.remove(os.path.join(EXP_DATA_PATH, d, name))
     print('clear all average data done !')
 
 
 def dump_avg_data(name):
-    dirs = os.listdir(EXPS_DATA_PATH)
+    dirs = os.listdir(EXP_DATA_PATH)
     for d in dirs:
-        comp_avg(os.path.join(EXPS_DATA_PATH, d), name)
+        comp_avg(os.path.join(EXP_DATA_PATH, d), name)
     print('dump all average data done !')
 
 
 def test_res_data():
-    nodes = 16  # n=3f+1, 4, 7, 10, 13, 16, 19, 22, 25, 28
+    nodes = 22  # n=3f+1, 4, 7, 10, 13, 16, 19, 22, 25, 28
     steps = 10000  # total events or blocks
     ref_mode = 5  # 0: gossip, 1: height, 3: differ, 5: random
     count = 100  # running multiple times to get average
-    print('[running experiments with nodes='+str(nodes)+', steps='+str(steps)+' and ref_mode='+str(ref_mode)+']')
+    print('[running experiments with nodes=' + str(nodes) + ', steps=' + str(steps) + ' and ref_mode=' + str(
+        ref_mode) + ']')
     # executing the experiments
     work = exec_exp(nodes, steps, ref_mode, count)
     # computing the average result
